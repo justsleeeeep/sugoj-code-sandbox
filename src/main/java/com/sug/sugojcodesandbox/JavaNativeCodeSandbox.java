@@ -36,68 +36,86 @@ public class JavaNativeCodeSandbox implements CodeSandbox {
 
     @Override
     public ExecuteCodeResponse executeCode(ExecuteCodeRequest executeCodeRequest) {
-
-        //1.把code放到指定文件
-        List<String> inputList = executeCodeRequest.getInputList();
-        String code = executeCodeRequest.getCode();
-        String language = executeCodeRequest.getLanguage();
-
-        String userDir = System.getProperty("user.dir");
-        String grobalCodePathName = userDir + File.separator + GROBAL_CODE_DIR_NAME;
-
-        if (!FileUtil.exist(grobalCodePathName)) {
-            FileUtil.mkdir(grobalCodePathName);
-        }
-        String userCodeParentPath = grobalCodePathName + File.separator + UUID.randomUUID();
-        String userCodePath = userCodeParentPath + File.separator + GROBAL_JAVA_CLASS_NAME;
-        File userCodeFile = FileUtil.writeString(code, userCodePath, StandardCharsets.UTF_8);
-        //2.把文件编译
-        String compileCmd = String.format("javac -encoding utf-8 %s", userCodeFile.getAbsolutePath());
+        String userCodeParentPath = null;
+        File userCodeFile = null;
         try {
+
+            //1.把code放到指定文件
+            List<String> inputList = executeCodeRequest.getInputList();
+            String code = executeCodeRequest.getCode();
+            String language = executeCodeRequest.getLanguage();
+
+            String userDir = System.getProperty("user.dir");
+            String grobalCodePathName = userDir + File.separator + GROBAL_CODE_DIR_NAME;
+
+            if (!FileUtil.exist(grobalCodePathName)) {
+                FileUtil.mkdir(grobalCodePathName);
+            }
+            userCodeParentPath = grobalCodePathName + File.separator + UUID.randomUUID();
+            String userCodePath = userCodeParentPath + File.separator + GROBAL_JAVA_CLASS_NAME;
+            userCodeFile = FileUtil.writeString(code, userCodePath, StandardCharsets.UTF_8);
+            //2.把文件编译
+            String compileCmd = String.format("javac -encoding utf-8 %s", userCodeFile.getAbsolutePath());
+
             Process compileProcess = Runtime.getRuntime().exec(compileCmd);
-            ExecuteMessage executeMessage = ProcessUtils.runProcessAndGetMessage(compileProcess, "编译");
-            System.out.println(executeMessage);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        //3.运行编译的.class
-        List<ExecuteMessage>executeMessageList =new ArrayList<>();
-        for (String input : inputList) {
-            String runCmd = String.format("java -Dfile.encoding=UTF-8 -cp %s Main", userCodeParentPath);
-            try {
+            ExecuteMessage executeCompileMessage = ProcessUtils.runProcessAndGetMessage(compileProcess, "编译");
+            System.out.println(executeCompileMessage);
+            if (executeCompileMessage.getExitValue() != 0) {
+                ExecuteCodeResponse executeCodeResponse = new ExecuteCodeResponse();
+                executeCodeResponse.setStatus(2);
+                return executeCodeResponse;
+            }
+
+            //3.运行编译的.class
+            List<ExecuteMessage> executeRunMessageList = new ArrayList<>();
+            for (String input : inputList) {
+                String runCmd = String.format("java -Dfile.encoding=UTF-8 -cp %s Main", userCodeParentPath);
+
                 Process runProcess = Runtime.getRuntime().exec(runCmd);
-                ExecuteMessage executeMessage = ProcessUtils.runInteractProcessAndGetMessage(runProcess, "运行", input);
-                System.out.println(executeMessage);
-                executeMessageList.add(executeMessage);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+                ExecuteMessage executeRunMessage = ProcessUtils.runInteractProcessAndGetMessage(runProcess, "运行", input);
+                System.out.println(executeRunMessage);
+                executeRunMessageList.add(executeRunMessage);
+
             }
-        }
-        //4.整理输出信息
-        ExecuteCodeResponse executeCodeResponse = new ExecuteCodeResponse();
-        //执行没错误初始为1
-        executeCodeResponse.setStatus(1);
-        List<String>outList=new ArrayList<>();
-        Long executeTime=0L;
-        for(ExecuteMessage executeMessage:executeMessageList)
-        {
-            String errorMessage=executeMessage.getErrorMessage();
-            if(!StrUtil.isBlank(errorMessage))
-            {
-                executeCodeResponse.setMessage(errorMessage);
-                //执行中存在错误
-                executeCodeResponse.setStatus(3);
-                break;
+
+
+            //4.整理输出信息
+            ExecuteCodeResponse executeCodeResponse = new ExecuteCodeResponse();
+            //执行没错误初始为1
+            executeCodeResponse.setStatus(1);
+            List<String> outList = new ArrayList<>();
+            Long executeTime = 0L;
+            for (ExecuteMessage executeMessage : executeRunMessageList) {
+                String errorMessage = executeMessage.getErrorMessage();
+                if (!StrUtil.isBlank(errorMessage)) {
+                    executeCodeResponse.setMessage(errorMessage);
+                    //执行中存在错误
+                    executeCodeResponse.setStatus(3);
+                    break;
+                }
+                outList.add(executeMessage.getMessage());
+                executeTime = Math.max(executeMessage.getTime(), executeTime);
             }
-            outList.add(executeMessage.getMessage());
-            executeTime=Math.max(executeMessage.getTime(),executeTime);
-        }
-        executeCodeResponse.setOutputList(outList);
-        JudgeInfo judgeInfo =new JudgeInfo();
-        judgeInfo.setTime(executeTime);
+            executeCodeResponse.setOutputList(outList);
+            JudgeInfo judgeInfo = new JudgeInfo();
+            judgeInfo.setTime(executeTime);
 //        judgeInfo.setMemory();
-        executeCodeResponse.setJudgeInfo(judgeInfo);
-        System.out.println(judgeInfo);
-        return null;
+            executeCodeResponse.setJudgeInfo(judgeInfo);
+            System.out.println(judgeInfo);
+            return executeCodeResponse;
+        } catch (IOException e) {
+            //系统错误
+            //            throw new RuntimeException(e);
+            ExecuteCodeResponse executeCodeResponse = new ExecuteCodeResponse();
+            executeCodeResponse.setStatus(4);
+            executeCodeResponse.setMessage(e.getMessage());
+            return executeCodeResponse;
+        } finally {
+            //删除多余的文件
+            if (userCodeFile.getParentFile() != null) {
+                boolean delete = FileUtil.del(userCodeParentPath);
+                System.out.println("删除多余文件" + (delete ? "成功" : "失败"));
+            }
+        }
     }
 }
