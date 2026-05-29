@@ -32,7 +32,8 @@ public class JavaNativeCodeSandbox implements CodeSandbox {
         //String code = ResourceUtil.readStr("TestCode/UnSafeCode/SleepError.java", StandardCharsets.UTF_8);
         //String code = ResourceUtil.readStr("TestCode/UnSafeCode/MemoryError.java", StandardCharsets.UTF_8);
         //String code = ResourceUtil.readStr("TestCode/UnSafeCode/ReadFileError.java", StandardCharsets.UTF_8);
-        String code = ResourceUtil.readStr("TestCode/UnSafeCode/WriteFileError.java", StandardCharsets.UTF_8);
+        //String code = ResourceUtil.readStr("TestCode/UnSafeCode/WriteFileError.java", StandardCharsets.UTF_8);
+        String code = ResourceUtil.readStr("TestCode/UnSafeCode/RunFileError.java", StandardCharsets.UTF_8);
         executeCodeRequest.setCode(code);
         executeCodeRequest.setLanguage("java");
         javaNativeCodeSandbox.executeCode(executeCodeRequest);
