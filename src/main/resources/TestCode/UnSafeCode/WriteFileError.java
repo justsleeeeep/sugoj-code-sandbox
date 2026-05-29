@@ -1,12 +1,11 @@
-package com.sug.sugojcodesandbox.unsafe;
+
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 
-public class WriteFileError
+public class Main
 {
     public static void main(String[] args) throws IOException {
         String userDir=System.getProperty("user.dir");
