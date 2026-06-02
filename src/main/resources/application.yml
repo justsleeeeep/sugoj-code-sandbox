@@ -1,0 +1,6 @@
+spring:
+    application:
+        name: sugoj-code-sandbox
+
+server:
+    port: 7528
