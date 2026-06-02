@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 public class WriteFileError
@@ -12,7 +13,7 @@ public class WriteFileError
         String userDir=System.getProperty("user.dir");
         String path=userDir+ File.separator+"src/main/resources/dangerous.bat";
         String errorProgram="java -version 2>&1";
-        Files.write(Path.of(path), errorProgram.getBytes());
+        Files.write(Paths.get(path), errorProgram.getBytes());
         System.out.println("dangerous");
     }
 }

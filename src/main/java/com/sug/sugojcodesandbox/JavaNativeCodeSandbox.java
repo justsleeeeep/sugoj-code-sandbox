@@ -3,10 +3,15 @@ package com.sug.sugojcodesandbox;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.resource.ResourceUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.dfa.FoundWord;
+import cn.hutool.dfa.WordTree;
+import cn.hutool.extra.tokenizer.Word;
 import com.sug.sugojcodesandbox.model.ExecuteCodeRequest;
 import com.sug.sugojcodesandbox.model.ExecuteCodeResponse;
 import com.sug.sugojcodesandbox.model.ExecuteMessage;
 import com.sug.sugojcodesandbox.model.JudgeInfo;
+import com.sug.sugojcodesandbox.security.DefaultSecurityManager;
+import com.sug.sugojcodesandbox.security.DenySecurityManager;
 import com.sug.sugojcodesandbox.utils.ProcessUtils;
 import org.springframework.util.StopWatch;
 
@@ -23,7 +28,12 @@ import static java.lang.Math.max;
 public class JavaNativeCodeSandbox implements CodeSandbox {
     private static final String GROBAL_CODE_DIR_NAME = "tmpCode";
     private static final String GROBAL_JAVA_CLASS_NAME = "Main.java";
-
+    private static final Long TIME_OUT=10*1000L;
+    private static final List<String>blackList=Arrays.asList("Files","exec");
+    private static final WordTree wordTree= new WordTree();
+    static{
+        wordTree.addWords(blackList);
+    }
     public static void main(String[] args) {
         JavaNativeCodeSandbox javaNativeCodeSandbox = new JavaNativeCodeSandbox();
         ExecuteCodeRequest executeCodeRequest = new ExecuteCodeRequest();
@@ -41,15 +51,21 @@ public class JavaNativeCodeSandbox implements CodeSandbox {
 
     @Override
     public ExecuteCodeResponse executeCode(ExecuteCodeRequest executeCodeRequest) {
+        System.setSecurityManager(new DenySecurityManager());
+        List<String> inputList = executeCodeRequest.getInputList();
+        String code = executeCodeRequest.getCode();
+        String language = executeCodeRequest.getLanguage();
         String userCodeParentPath = null;
         File userCodeFile = null;
+//        FoundWord foundWord=wordTree.matchWord(code);
+//        if(foundWord!=null)
+//        {
+//            System.out.println(foundWord);
+//            return null;
+//        }
         try {
 
             //1.把code放到指定文件
-            List<String> inputList = executeCodeRequest.getInputList();
-            String code = executeCodeRequest.getCode();
-            String language = executeCodeRequest.getLanguage();
-
             String userDir = System.getProperty("user.dir");
             String grobalCodePathName = userDir + File.separator + GROBAL_CODE_DIR_NAME;
 
@@ -74,9 +90,16 @@ public class JavaNativeCodeSandbox implements CodeSandbox {
             //3.运行编译的.class
             List<ExecuteMessage> executeRunMessageList = new ArrayList<>();
             for (String input : inputList) {
-                String runCmd = String.format("java -Dfile.encoding=UTF-8 -cp %s Main", userCodeParentPath);
-
+                String runCmd = String.format("java -Xmx256m -Dfile.encoding=UTF-8 -cp %s Main", userCodeParentPath);
                 Process runProcess = Runtime.getRuntime().exec(runCmd);
+                new Thread(()-> {
+                    try {
+                        Thread.sleep(TIME_OUT);
+                        runProcess.destroy();
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }).start();
                 ExecuteMessage executeRunMessage = ProcessUtils.runInteractProcessAndGetMessage(runProcess, "运行", input);
                 System.out.println(executeRunMessage);
                 executeRunMessageList.add(executeRunMessage);
@@ -117,7 +140,7 @@ public class JavaNativeCodeSandbox implements CodeSandbox {
             return executeCodeResponse;
         } finally {
             //删除多余的文件
-            if (userCodeFile.getParentFile() != null) {
+            if (userCodeFile != null && userCodeFile.getParentFile() != null) {
                 boolean delete = FileUtil.del(userCodeParentPath);
                 System.out.println("删除多余文件" + (delete ? "成功" : "失败"));
             }
