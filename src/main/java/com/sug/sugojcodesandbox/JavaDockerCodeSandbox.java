@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 
 public class JavaDockerCodeSandbox implements CodeSandbox {
@@ -112,8 +113,11 @@ public class JavaDockerCodeSandbox implements CodeSandbox {
             HostConfig hostConfig = new HostConfig();
             hostConfig.withMemory(100 * 1000 * 1000L);
             hostConfig.withCpuCount(1L);
+            //hostConfig.withSecurityOpts(Arrays.asList("seccomp=default"));
             hostConfig.setBinds(new Bind(userCodeParentPath, new Volume("/app")));
             CreateContainerResponse createContainerResponse = createContainerCmd
+                    .withNetworkDisabled(true)
+                    .withReadonlyRootfs(true)
                     .withHostConfig(hostConfig)
                     .withAttachStdin(true)
                     .withAttachStderr(true)
@@ -186,19 +190,29 @@ public class JavaDockerCodeSandbox implements CodeSandbox {
                         ByteArrayOutputStream errorStream = new ByteArrayOutputStream()
                 ) {
                     // 执行命令并阻塞等待其完成
-                    dockerClient.execStartCmd(execId)
+                    boolean complete= dockerClient.execStartCmd(execId)
                             .withDetach(false)
                             .withTty(false)
                             .exec(new ExecStartResultCallback(outputStream, errorStream))
-                            .awaitCompletion();
+                            .awaitCompletion(TIME_OUT, TimeUnit.MILLISECONDS);
                     stopWatch.stop();
                     long totalTimeMillis = stopWatch.getTotalTimeMillis();
                     statisticsResultCallback.close();
                     // 收集当前用例的运行结果
-                    executeMessage.setTime(totalTimeMillis);
-                    executeMessage.setMemory(maxMemory[0]);
-                    executeMessage.setMessage(outputStream.toString("UTF-8").trim());
-                    executeMessage.setErrorMessage(errorStream.toString("UTF-8").trim());
+                    if(!complete)
+                    {
+                        executeMessage.setExitValue(1); // 标记非正常退出
+                        executeMessage.setMessage("");
+                        executeMessage.setErrorMessage("Time Limit Exceeded"); // 抛出超时错误
+                    }
+                    else
+                    {
+                        executeMessage.setExitValue(0);
+                        executeMessage.setTime(totalTimeMillis);
+                        executeMessage.setMemory(maxMemory[0]);
+                        executeMessage.setMessage(outputStream.toString("UTF-8").trim());
+                        executeMessage.setErrorMessage(errorStream.toString("UTF-8").trim());
+                    }
                     executeMessageList.add(executeMessage);
 
                 } catch (Exception e) {
