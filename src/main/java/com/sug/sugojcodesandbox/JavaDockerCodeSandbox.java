@@ -92,7 +92,8 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
         dockerClient.startContainerCmd(containerId).exec();
         List<ExecuteMessage> executeMessageList = new ArrayList<>();
 
-        for (String input : inputList) {
+        for (String input : inputList)
+        {
             final long[] maxMemory = {0L};
             //获取程序内存
             StatsCmd statsCmd = dockerClient.statsCmd(containerId);

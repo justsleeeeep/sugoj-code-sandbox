@@ -61,7 +61,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
         if(executeCompileMessage.getExitValue()!=0)
         {
             executeCompileMessage.setErrorMessage("compile error");
-            throw new RuntimeException("compile error");
+//            throw new RuntimeException("compile error");
         }
         return executeCompileMessage;
     }
@@ -125,6 +125,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
         executeCodeResponse.setStatus(1);
         List<String> outList = new ArrayList<>();
         Long executeTime = 0L;
+        Long executeMemory = 0L;
         for (ExecuteMessage executeMessage : executeRunMessageList) {
             String errorMessage = executeMessage.getErrorMessage();
             if (!StrUtil.isBlank(errorMessage)) {
@@ -135,11 +136,12 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
             }
             outList.add(executeMessage.getMessage());
             executeTime = Math.max(executeMessage.getTime(), executeTime);
+            executeMemory = Math.max(executeMessage.getMemory(), executeMemory);
         }
         executeCodeResponse.setOutputList(outList);
         JudgeInfo judgeInfo = new JudgeInfo();
         judgeInfo.setTime(executeTime);
-        //judgeInfo.setMemory();
+        judgeInfo.setMemory(executeMemory);
         executeCodeResponse.setJudgeInfo(judgeInfo);
         System.out.println(judgeInfo);
         return executeCodeResponse;
@@ -176,6 +178,15 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
         File userCodeFile= saveCodeToFile(code,grobalCodePathName,userCodePath);
         //2.把文件编译
         ExecuteMessage compileExecuteMessage = compileFile(userCodeFile);
+        if(compileExecuteMessage.getExitValue()!=0)
+        {
+            JudgeInfo judgeInfo=new JudgeInfo();
+            judgeInfo.setMessage(compileExecuteMessage.getErrorMessage());
+            //System.out.println(judgeInfo);
+            ExecuteCodeResponse executeCodeResponse = new ExecuteCodeResponse();
+            executeCodeResponse.setJudgeInfo(judgeInfo);
+            return executeCodeResponse;
+        }
         //3.运行编译的.class
         List<ExecuteMessage>executeRunMessageList = runCode(inputList,userCodeParentPath);
         //4.整理输出信息
